@@ -67,6 +67,7 @@ export default function App() {
   const folderInput = useRef<HTMLInputElement>(null);
   const aborts = useRef(new Map<string, AbortController>());
   const progress = useRef(new Map<string, number>());
+  const samples = useRef(new Map<string, { t: number; done: number; speed: number }>());
   const flushTimer = useRef<number | null>(null);
 
   // ───────── progress (throttled so big files don't re-render 60k times) ─────────
@@ -76,13 +77,28 @@ export default function App() {
     flushTimer.current = window.setTimeout(() => {
       flushTimer.current = null;
       const snap = new Map(progress.current);
-      setTransfers((ts) => ts.map((x) => (x.state === 'active' && snap.has(x.id) ? { ...x, done: snap.get(x.id)! } : x)));
+      const now = performance.now();
+      const speeds = new Map<string, number>();
+      for (const [id, done] of snap) {
+        const prev = samples.current.get(id);
+        let speed = prev?.speed ?? 0;
+        if (prev && now > prev.t) {
+          const inst = ((done - prev.done) / (now - prev.t)) * 1000;
+          speed = prev.speed ? prev.speed * 0.7 + inst * 0.3 : inst; // smoothed
+        }
+        samples.current.set(id, { t: now, done, speed });
+        speeds.set(id, speed);
+      }
+      setTransfers((ts) =>
+        ts.map((x) => (x.state === 'active' && snap.has(x.id) ? { ...x, done: snap.get(x.id)!, speed: speeds.get(x.id) } : x)),
+      );
     }, 200);
   }, []);
 
   const patch = useCallback((id: string, p: Partial<Transfer>) => setTransfers((ts) => ts.map((x) => (x.id === id ? { ...x, ...p } : x))), []);
   const dropTransfer = useCallback((id: string) => {
     progress.current.delete(id);
+    samples.current.delete(id);
     setTransfers((ts) => ts.filter((x) => x.id !== id));
   }, []);
 

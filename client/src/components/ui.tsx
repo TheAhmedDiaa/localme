@@ -505,6 +505,17 @@ export interface Transfer {
   total: number;
   state: 'active' | 'done' | 'error';
   msg?: string;
+  /** smoothed bytes per second while active */
+  speed?: number;
+}
+
+/** 75 -> "1:15", 3700 -> "1:01:40" (digits only, works in any language) */
+function formatEta(sec: number): string {
+  const s = Math.max(1, Math.round(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${r}` : `${m}:${r}`;
 }
 
 export function TransferPanel({
@@ -541,7 +552,7 @@ export function TransferPanel({
               <div style={{ width: `${x.state === 'error' ? 100 : pct}%` }} />
             </div>
             <small className="muted">
-              {x.state === 'error' ? `${t('failed')}: ${x.msg ?? ''}` : x.state === 'done' ? t('done') : `${formatSize(x.done)} / ${x.total ? formatSize(x.total) : '…'}  (${pct}%)`}
+              {x.state === 'error' ? `${t('failed')}: ${x.msg ?? ''}` : x.state === 'done' ? t('done') : `${formatSize(x.done)} / ${x.total ? formatSize(x.total) : '…'}  (${pct}%)${x.speed ? ` · ${formatSize(x.speed)}/s` : ''}${x.speed && x.total > x.done ? ` · ${t('timeLeft', { time: formatEta((x.total - x.done) / x.speed) })}` : ''}`}
             </small>
           </div>
         );

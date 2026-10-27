@@ -5,11 +5,11 @@ const ICE: RTCConfiguration = {
   iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }, { urls: 'stun:stun.l.google.com:19302' }],
 };
 
-const CHUNK = 16 * 1024; // safe across Chrome/Firefox/Safari
-const READ_BLOCK = 1024 * 1024;
-const WINDOW = 8 * 1024 * 1024; // max un-acked bytes in flight
-const HIGH_WATER = 4 * 1024 * 1024; // dc.bufferedAmount ceiling
-const ACK_EVERY = 1024 * 1024;
+const CHUNK = 64 * 1024; // used when the browser allows it (maxMessageSize), else 16 KB
+const READ_BLOCK = 4 * 1024 * 1024;
+const WINDOW = 16 * 1024 * 1024; // max un-acked bytes in flight
+const HIGH_WATER = 8 * 1024 * 1024; // dc.bufferedAmount ceiling
+const ACK_EVERY = 2 * 1024 * 1024;
 
 export class DenyError extends Error {
   constructor(public why: 'password' | 'gone') {
@@ -119,7 +119,7 @@ export class P2P {
     let wakeLow: (() => void) | null = null;
     let busy = false;
 
-    dc.bufferedAmountLowThreshold = 1024 * 1024;
+    dc.bufferedAmountLowThreshold = 2 * 1024 * 1024;
     dc.onbufferedamountlow = () => wakeLow?.();
     dc.onclose = () => {
       aborted = true;
@@ -155,15 +155,24 @@ export class P2P {
         }
         sendJson({ t: 'start', name: file.name, size: file.size, mime: file.type || 'application/octet-stream' });
 
+        const maxMsg = this.conns.get(connId)?.pc.sctp?.maxMessageSize ?? 16 * 1024;
+        const chunk = maxMsg >= CHUNK ? CHUNK : 16 * 1024;
+        const readBlock = (at: number) =>
+          file
+            .slice(at, at + READ_BLOCK)
+            .arrayBuffer()
+            .then((b) => new Uint8Array(b));
+        let next: Promise<Uint8Array<ArrayBuffer>> | null = file.size > 0 ? readBlock(0) : null;
         let sent = 0;
         for (let blockStart = 0; blockStart < file.size && !aborted; blockStart += READ_BLOCK) {
-          const block = new Uint8Array(await file.slice(blockStart, blockStart + READ_BLOCK).arrayBuffer());
-          for (let o = 0; o < block.byteLength && !aborted; o += CHUNK) {
+          const block = await next!;
+          next = blockStart + READ_BLOCK < file.size ? readBlock(blockStart + READ_BLOCK) : null; // read ahead while sending
+          for (let o = 0; o < block.byteLength && !aborted; o += chunk) {
             while (!aborted && sent - acked >= WINDOW) await new Promise<void>((r) => (wakeAck = r));
             while (!aborted && dc.readyState === 'open' && dc.bufferedAmount > HIGH_WATER)
               await new Promise<void>((r) => (wakeLow = r));
             if (aborted || dc.readyState !== 'open') return;
-            const piece = block.subarray(o, Math.min(o + CHUNK, block.byteLength));
+            const piece = block.subarray(o, Math.min(o + chunk, block.byteLength));
             dc.send(piece);
             sent += piece.byteLength;
           }

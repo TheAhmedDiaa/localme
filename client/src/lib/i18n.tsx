@@ -86,6 +86,7 @@ const en = {
   everyone: 'Everyone',
   onlyFor: 'Only for {name}',
   privateToYou: 'Sent only to you',
+  timeLeft: '{time} left',
 } as const;
 
 const ar: Record<keyof typeof en, string> = {
@@ -169,6 +170,7 @@ const ar: Record<keyof typeof en, string> = {
   shareWithPw: 'مشاركة بكلمة مرور',
   sendTo: 'إرسال إلى',
   everyone: 'الجميع',
+  timeLeft: 'متبقي {time}',
   onlyFor: 'فقط لـ {name}',
   privateToYou: 'أُرسل إليك فقط',
 };
