@@ -118,20 +118,51 @@ export function SetPasswordDialog({
   );
 }
 
+// ───────────────────────────── send-to picker ─────────────────────────────
+
+/** Choose who can see what you share: everyone in the room, or one device. '' = everyone. */
+export function TargetPicker({ devices, value, onChange }: { devices: Device[]; value: string; onChange: (id: string) => void }) {
+  const { t, deviceName } = useI18n();
+  const labelId = useId();
+  if (!devices.length) return null;
+  return (
+    <div className="field">
+      <span className="field-label" id={labelId}>
+        {t('sendTo')}
+      </span>
+      <div className="target-picker" role="radiogroup" aria-labelledby={labelId}>
+        <button type="button" role="radio" aria-checked={value === ''} className={`target${value === '' ? ' on' : ''}`} onClick={() => onChange('')}>
+          <Icon name="wifi" size={16} />
+          {t('everyone')}
+        </button>
+        {devices.map((d) => (
+          <button key={d.id} type="button" role="radio" aria-checked={value === d.id} className={`target${value === d.id ? ' on' : ''}`} onClick={() => onChange(d.id)}>
+            <Avatar device={d} />
+            {deviceName(d)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ───────────────────────────── share (password choice) dialog ─────────────────────────────
 
 /** Shown before anything is shared: protect with a password or not. */
 export function ShareDialog({
   names,
+  devices,
   onConfirm,
   onClose,
 }: {
   names: string[];
-  onConfirm: (password: string) => void;
+  devices: Device[];
+  onConfirm: (password: string, to: string) => void;
   onClose: () => void;
 }) {
   const { t } = useI18n();
   const [pw, setPw] = useState('');
+  const [to, setTo] = useState('');
   const shown = names.slice(0, 4);
   const inputId = useId();
   const hintId = useId();
@@ -140,7 +171,7 @@ export function ShareDialog({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onConfirm(pw);
+          onConfirm(pw, to);
         }}
       >
         <ul className="share-list">
@@ -162,6 +193,7 @@ export function ShareDialog({
             {t('shareHint')}
           </div>
         </div>
+        <TargetPicker devices={devices} value={to} onChange={setTo} />
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
             {t('cancel')}
@@ -178,18 +210,20 @@ export function ShareDialog({
 
 // ───────────────────────────── text dialog ─────────────────────────────
 
-export function TextDialog({ onSubmit, onClose }: { onSubmit: (text: string) => void; onClose: () => void }) {
+export function TextDialog({ devices, onSubmit, onClose }: { devices: Device[]; onSubmit: (text: string, to: string) => void; onClose: () => void }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
+  const [to, setTo] = useState('');
   return (
     <Modal title={t('addText')} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (text.trim()) onSubmit(text);
+          if (text.trim()) onSubmit(text, to);
         }}
       >
         <textarea autoFocus aria-label={t('addText')} rows={7} maxLength={20000} placeholder={t('textPlaceholder')} value={text} onChange={(e) => setText(e.target.value)} />
+        <TargetPicker devices={devices} value={to} onChange={setTo} />
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
             {t('cancel')}
@@ -375,12 +409,14 @@ export function ItemRow({
   item,
   mine,
   ownerName,
+  toName,
   actions,
   copied,
 }: {
   item: ItemMeta;
   mine: boolean;
   ownerName: string;
+  toName?: string;
   actions: ItemActions;
   copied: boolean;
 }) {
@@ -401,6 +437,12 @@ export function ItemRow({
           ) : (
             <span title={item.path}>
               <bdi>{item.path}</bdi>
+            </span>
+          )}
+          {item.to && (
+            <span className="badge">
+              <Icon name="eye" size={12} />
+              {mine ? t('onlyFor', { name: toName ?? '…' }) : t('privateToYou')}
             </span>
           )}
           {item.locked && (

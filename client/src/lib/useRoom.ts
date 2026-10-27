@@ -134,7 +134,7 @@ export function useRoom(code: string | null) {
   }, [code, p2p, sendAdd]);
 
   const addPicked = useCallback(
-    (picked: Picked[], password?: string) => {
+    (picked: Picked[], password?: string, to?: string) => {
       const metas: NewItem[] = [];
       for (const { file, path } of picked) {
         const meta: NewItem = {
@@ -145,6 +145,7 @@ export function useRoom(code: string | null) {
           size: file.size,
           mime: file.type || 'application/octet-stream',
           locked: !!password,
+          ...(to ? { to } : {}),
         };
         local.set(meta.id, { meta, file, password: password || undefined });
         metas.push(meta);
@@ -155,7 +156,7 @@ export function useRoom(code: string | null) {
   );
 
   const addText = useCallback(
-    (text: string) => {
+    (text: string, to?: string) => {
       const clean = text.trim();
       if (!clean) return;
       const firstLine = clean.split('\n', 1)[0] ?? clean;
@@ -168,6 +169,7 @@ export function useRoom(code: string | null) {
         mime: 'text/plain',
         locked: false,
         text: clean,
+        ...(to ? { to } : {}),
       };
       local.set(meta.id, { meta });
       sendAdd([meta]);

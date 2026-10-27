@@ -281,6 +281,7 @@ export default function App() {
   };
 
   const byId = new Map(devices.map((d) => [d.id, d]));
+  const others = devices.filter((d) => d.id !== you?.id);
   const sorted = [...items].sort((a, b) => b.addedAt - a.addedAt);
   const countLabel = sorted.length === 1 ? t('itemOne') : t('items', { n: sorted.length });
   const roomLabel = room?.kind === 'private' ? `${t('roomPrivate')} · ${room.code}` : t('roomNetwork');
@@ -399,6 +400,7 @@ export default function App() {
                 item={item}
                 mine={item.ownerId === you?.id}
                 ownerName={deviceName(byId.get(item.ownerId))}
+                toName={item.to ? deviceName(byId.get(item.to)) : undefined}
                 actions={actions}
                 copied={copiedId === item.id}
               />
@@ -429,9 +431,10 @@ export default function App() {
 
       {dialog === 'text' && (
         <TextDialog
+          devices={others}
           onClose={() => setDialog(null)}
-          onSubmit={(text) => {
-            addText(text);
+          onSubmit={(text, to) => {
+            addText(text, to || undefined);
             setDialog(null);
           }}
         />
@@ -439,9 +442,10 @@ export default function App() {
       {pending && (
         <ShareDialog
           names={pending.map((p) => p.path)}
+          devices={others}
           onClose={() => setPending(null)}
-          onConfirm={(pw) => {
-            addPicked(pending, pw);
+          onConfirm={(pw, to) => {
+            addPicked(pending, pw, to || undefined);
             setPending(null);
           }}
         />

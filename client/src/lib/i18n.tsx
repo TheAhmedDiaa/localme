@@ -82,6 +82,10 @@ const en = {
   shareAsk: 'Do you want to protect it with a password? Anyone downloading it will have to enter it.',
   shareNoPw: 'Share without password',
   shareWithPw: 'Share with password',
+  sendTo: 'Send to',
+  everyone: 'Everyone',
+  onlyFor: 'Only for {name}',
+  privateToYou: 'Sent only to you',
 } as const;
 
 const ar: Record<keyof typeof en, string> = {
@@ -163,6 +167,10 @@ const ar: Record<keyof typeof en, string> = {
   shareAsk: 'هل تريد حمايته بكلمة مرور؟ سيُطلب من كل من يحمّله إدخالها.',
   shareNoPw: 'مشاركة بدون كلمة مرور',
   shareWithPw: 'مشاركة بكلمة مرور',
+  sendTo: 'إرسال إلى',
+  everyone: 'الجميع',
+  onlyFor: 'فقط لـ {name}',
+  privateToYou: 'أُرسل إليك فقط',
 };
 
 const dict = { en, ar };

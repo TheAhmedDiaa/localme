@@ -35,6 +35,8 @@ export interface ItemMeta {
   /** only for kind === 'text'; kept in server memory while the owner is connected */
   text?: string;
   addedAt: number;
+  /** when set, only this device (and the owner) can see the item */
+  to?: string;
 }
 
 export type NewItem = Omit<ItemMeta, 'ownerId' | 'addedAt'>;

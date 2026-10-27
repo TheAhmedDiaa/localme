@@ -110,7 +110,7 @@ export class Room {
       you: device,
       room,
       devices: [...this.peers.values()].map((p) => p.device),
-      items: [...this.items.values()],
+      items: [...this.items.values()].filter((i) => this.canSee(i, device.id)),
     });
     this.peers.set(device.id, peer);
     this.broadcast({ t: 'joined', device }, device.id);
@@ -119,6 +119,11 @@ export class Room {
     const cleanup = () => this.onGone(peer);
     ws.addEventListener('close', cleanup);
     ws.addEventListener('error', cleanup);
+  }
+
+  /** Items sent to one device are visible only to that device and the owner. */
+  private canSee(item: ItemMeta, viewerId: string): boolean {
+    return !item.to || item.ownerId === viewerId || item.to === viewerId;
   }
 
   private onGone(peer: Peer) {
@@ -170,7 +175,12 @@ export class Room {
           this.items.set(item.id, item);
           accepted.push(item);
         }
-        if (accepted.length) this.broadcast({ t: 'added', items: accepted });
+        if (accepted.length) {
+          for (const [id, p] of this.peers) {
+            const visible = accepted.filter((i) => this.canSee(i, id));
+            if (visible.length) this.send(p.ws, { t: 'added', items: visible });
+          }
+        }
         break;
       }
       case 'remove': {
@@ -221,6 +231,7 @@ export class Room {
       locked: kind === 'file' && raw.locked === true,
       addedAt: Date.now(),
     };
+    if (typeof raw.to === 'string' && raw.to.length > 0 && raw.to.length <= 40 && raw.to !== ownerId) item.to = raw.to;
     if (kind === 'text') {
       if (typeof text !== 'string' || text.length > LIMITS.maxTextLength) return null;
       item.text = text;

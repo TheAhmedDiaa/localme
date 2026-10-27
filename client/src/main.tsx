@@ -4,6 +4,7 @@ import App from './App';
 import { I18nProvider } from './lib/i18n';
 import { registerSW } from './lib/sink';
 import './theme.css';
+import './send-to.css';
 
 registerSW();
 

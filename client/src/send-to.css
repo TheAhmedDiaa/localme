@@ -1,0 +1,41 @@
+/* Send-to-one-device picker */
+.target-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.target {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.target:hover {
+  border-color: var(--primary);
+}
+.target.on {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  font-weight: 600;
+}
+.target:focus-visible {
+  outline: 2px solid var(--focus, var(--primary));
+  outline-offset: 2px;
+}
+.target .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+@media (pointer: coarse) {
+  .target {
+    min-height: 44px;
+  }
+}
