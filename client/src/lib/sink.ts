@@ -25,23 +25,86 @@ function safeName(name: string) {
 async function swSink(name: string, size: number | undefined, mime: string): Promise<WritableStream<Uint8Array> | null> {
   const reg = swReady ? await swReady : null;
   const sw = reg?.active;
-  if (!sw || !navigator.serviceWorker.controller) return null;
+  if (!sw) return null;
 
+  const SW_WINDOW = 8 * 1024 * 1024; // max bytes handed to the service worker but not yet read by the browser
   const id = uid(16);
   const ch = new MessageChannel();
+  let sent = 0;
+  let delivered = 0;
+  let lastAck = Date.now();
+  let cancelled = false;
+  let waiter: (() => void) | null = null;
+  const wake = () => {
+    const w = waiter;
+    waiter = null;
+    w?.();
+  };
+  const waitSignal = () =>
+    new Promise<void>((r) => {
+      waiter = r;
+      setTimeout(r, 1000);
+    });
+
+  // Wait until the service worker confirms it holds the stream, so the iframe request can't miss it.
+  const ready = new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => resolve(false), 3000);
+    ch.port1.onmessage = (ev) => {
+      const d = ev.data;
+      if (d === 'ready') {
+        clearTimeout(timer);
+        resolve(true);
+      } else if (d === 'cancel') {
+        cancelled = true;
+        wake();
+      } else if (d && typeof d.delivered === 'number') {
+        delivered = d.delivered;
+        lastAck = Date.now();
+        wake();
+      }
+    };
+  });
   sw.postMessage({ type: 'dl', id, name: safeName(name), size, mime }, [ch.port2]);
+  if (!(await ready)) return null;
+
   const frame = document.createElement('iframe');
   frame.hidden = true;
   frame.src = `/__dl/${id}`;
   document.body.append(frame);
-  const cleanup = () => setTimeout(() => frame.remove(), 5000);
+  // a message every few seconds keeps the service worker from being stopped mid-download
+  const keepAlive = window.setInterval(() => sw.postMessage({ type: 'ping' }), 10000);
+  const cleanup = () => {
+    clearInterval(keepAlive);
+    setTimeout(() => frame.remove(), 60000);
+  };
 
   return new WritableStream<Uint8Array>({
-    write(chunk) {
+    async write(chunk) {
+      // Backpressure: never run far ahead of what the browser has actually read.
+      while (!cancelled && sent - delivered >= SW_WINDOW) {
+        if (Date.now() - lastAck > 30000) {
+          cleanup();
+          throw new Error('The browser did not start the download.');
+        }
+        await waitSignal();
+      }
+      if (cancelled) {
+        cleanup();
+        throw new SaveCancelled();
+      }
       const copy = chunk.slice(); // own the buffer so we can transfer it
+      sent += copy.byteLength;
       ch.port1.postMessage(copy.buffer, [copy.buffer]);
     },
-    close() {
+    async close() {
+      // Only finish once the browser has taken every byte.
+      while (!cancelled && delivered < sent) {
+        if (Date.now() - lastAck > 30000) {
+          cleanup();
+          throw new Error('The browser stopped the download.');
+        }
+        await waitSignal();
+      }
       ch.port1.postMessage('end');
       cleanup();
     },
