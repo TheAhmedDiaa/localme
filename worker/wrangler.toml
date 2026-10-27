@@ -1,0 +1,15 @@
+name = "localme"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# Serves the built React app from the same Worker (one deploy for everything).
+[assets]
+directory = "../client/dist"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
