@@ -366,17 +366,67 @@ export function Avatar({ device, big }: { device: Device | null; big?: boolean }
 }
 
 /** "You are Fox 42" card plus the other devices currently in this room. */
-export function Presence({ you, devices, online }: { you: Device | null; devices: Device[]; online: boolean }) {
+export function Presence({
+  you,
+  devices,
+  online,
+  onRename,
+}: {
+  you: Device | null;
+  devices: Device[];
+  online: boolean;
+  onRename: (name: string) => void;
+}) {
   const { t, deviceName } = useI18n();
   const others = devices.filter((d) => d.id !== you?.id);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
   return (
     <section className={`presence${online ? '' : ' offline'}`} aria-label={t('devices')}>
       <div className="you-card">
         <Avatar device={you} big />
-        <div>
+        <div className="you-text">
           <p className="you-label">{t('youAre')}</p>
-          <p className="you-name">{deviceName(you ?? undefined)}</p>
+          {editing ? (
+            <form
+              className="rename-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onRename(draft);
+                setEditing(false);
+              }}
+            >
+              <input
+                autoFocus
+                maxLength={24}
+                autoComplete="off"
+                value={draft}
+                aria-label={t('renameDevice')}
+                placeholder={t('renamePlaceholder')}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+              />
+              <button type="submit" className="icon-btn" aria-label={t('ok')} title={t('ok')}>
+                <Icon name="check" size={18} />
+              </button>
+            </form>
+          ) : (
+            <p className="you-name">{deviceName(you ?? undefined)}</p>
+          )}
         </div>
+        {!editing && you && (
+          <button
+            className="icon-btn you-edit"
+            aria-label={t('renameDevice')}
+            title={t('renameDevice')}
+            onClick={() => {
+              setDraft(you.name ?? '');
+              setEditing(true);
+            }}
+          >
+            <Icon name="edit" size={18} />
+          </button>
+        )}
       </div>
       <p className="nearby" aria-live="polite">
         {others.length === 0 ? t('alone') : others.length === 1 ? t('nearbyOne') : t('nearby', { n: others.length })}

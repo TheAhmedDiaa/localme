@@ -43,6 +43,15 @@ export default {
   },
 };
 
+/** Device names: no control characters, single spaces, capped length. */
+function cleanName(s: string): string {
+  return s
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, LIMITS.maxDeviceName);
+}
+
 interface Peer {
   ws: WebSocket;
   device: Device;
@@ -202,6 +211,13 @@ export class Room {
           it.locked = !!msg.locked;
           this.broadcast({ t: 'locked', id: it.id, locked: it.locked });
         }
+        break;
+      }
+      case 'rename': {
+        const name = typeof msg.name === 'string' ? cleanName(msg.name) : '';
+        if (name) peer.device.name = name;
+        else delete peer.device.name;
+        this.broadcast({ t: 'renamed', id: me, name });
         break;
       }
       case 'signal': {

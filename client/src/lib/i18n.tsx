@@ -87,6 +87,8 @@ const en = {
   onlyFor: 'Only for {name}',
   privateToYou: 'Sent only to you',
   timeLeft: '{time} left',
+  renameDevice: 'Rename this device',
+  renamePlaceholder: 'Device name (empty = random)',
 } as const;
 
 const ar: Record<keyof typeof en, string> = {
@@ -171,6 +173,8 @@ const ar: Record<keyof typeof en, string> = {
   sendTo: 'إرسال إلى',
   everyone: 'الجميع',
   timeLeft: 'متبقي {time}',
+  renameDevice: 'إعادة تسمية هذا الجهاز',
+  renamePlaceholder: 'اسم الجهاز (فارغ = عشوائي)',
   onlyFor: 'فقط لـ {name}',
   privateToYou: 'أُرسل إليك فقط',
 };
@@ -187,7 +191,7 @@ interface Ctx {
   lang: Lang;
   toggleLang(): void;
   t(key: Key, vars?: Record<string, string | number>): string;
-  deviceName(d: Pick<Device, 'animal' | 'num'> | undefined): string;
+  deviceName(d: Pick<Device, 'animal' | 'num' | 'name'> | undefined): string;
 }
 
 const I18n = createContext<Ctx>(null as unknown as Ctx);
@@ -230,7 +234,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       lang,
       toggleLang: () => setLang((l) => (l === 'en' ? 'ar' : 'en')),
       t,
-      deviceName: (d) => (d ? `${ANIMALS[lang][d.animal] ?? ANIMALS[lang][0]} ${d.num}` : '…'),
+      deviceName: (d) => (d ? d.name || `${ANIMALS[lang][d.animal] ?? ANIMALS[lang][0]} ${d.num}` : '…'),
     }),
     [lang, t],
   );

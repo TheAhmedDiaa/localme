@@ -39,3 +39,27 @@
     min-height: 44px;
   }
 }
+
+/* Rename your device */
+.you-card .you-text {
+  flex: 1;
+  min-width: 0;
+}
+.you-card .you-name {
+  overflow-wrap: anywhere;
+}
+.you-card .you-edit {
+  flex: none;
+  margin-inline-start: auto;
+}
+.rename-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rename-form input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClientMsg, Device, ItemMeta, NewItem, RoomInfo, ServerMsg, SignalData } from '@localme/shared';
+import { LIMITS } from '@localme/shared';
 import { P2P } from './p2p';
 import { local, uid } from './registry';
 import type { Picked } from './files';
@@ -11,6 +12,15 @@ export interface RoomState {
   devices: Device[];
   items: ItemMeta[];
   error: string | null;
+}
+
+const NAME_KEY = 'lm-name';
+function savedName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? '';
+  } catch {
+    return '';
+  }
 }
 
 const INITIAL: RoomState = { status: 'connecting', you: null, room: null, devices: [], items: [], error: null };
@@ -71,6 +81,8 @@ export function useRoom(code: string | null) {
           setState({ status: 'online', you: m.you, room: m.room, devices: [...m.devices, m.you], items: m.items, error: null });
           // Re-announce what this device is sharing (first connect, or after a reconnect).
           sendAdd([...local.values()].map((l) => l.meta));
+          // Re-apply the custom device name (a reconnect gives a fresh random one).
+          if (savedName()) send({ t: 'rename', name: savedName() });
           break;
         case 'joined':
           setState((s) => ({ ...s, devices: [...s.devices.filter((d) => d.id !== m.device.id), m.device] }));
@@ -93,6 +105,13 @@ export function useRoom(code: string | null) {
           break;
         case 'locked':
           setState((s) => ({ ...s, items: s.items.map((i) => (i.id === m.id ? { ...i, locked: m.locked } : i)) }));
+          break;
+        case 'renamed':
+          setState((s) => {
+            const upd = (d: Device): Device =>
+              d.id === m.id ? { id: d.id, animal: d.animal, num: d.num, ...(m.name ? { name: m.name } : {}) } : d;
+            return { ...s, devices: s.devices.map(upd), you: s.you ? upd(s.you) : s.you };
+          });
           break;
         case 'signal':
           void p2p.onSignal(m.from, m.data as SignalData);
@@ -196,5 +215,19 @@ export function useRoom(code: string | null) {
     [send],
   );
 
-  return { state, p2p, addPicked, addText, remove, setPassword };
+  const rename = useCallback(
+    (name: string) => {
+      const clean = name.replace(/\s+/g, ' ').trim().slice(0, LIMITS.maxDeviceName);
+      try {
+        if (clean) localStorage.setItem(NAME_KEY, clean);
+        else localStorage.removeItem(NAME_KEY);
+      } catch {
+        /* ignore */
+      }
+      send({ t: 'rename', name: clean });
+    },
+    [send],
+  );
+
+  return { state, p2p, addPicked, addText, remove, setPassword, rename };
 }

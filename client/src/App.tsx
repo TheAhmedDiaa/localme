@@ -50,7 +50,7 @@ export default function App() {
   const { t, lang, toggleLang, deviceName } = useI18n();
   const [theme, toggleTheme] = useTheme();
   const [code, setCode] = useState<string | null>(roomFromUrl);
-  const { state, p2p, addPicked, addText, remove, setPassword } = useRoom(code);
+  const { state, p2p, addPicked, addText, remove, setPassword, rename } = useRoom(code);
   const { you, items, devices, room } = state;
 
   const [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -333,7 +333,7 @@ export default function App() {
         <aside className="side">
           <p className="tagline">{t('tagline')}</p>
 
-          <Presence you={you} devices={devices} online={state.status === 'online'} />
+          <Presence you={you} devices={devices} online={state.status === 'online'} onRename={rename} />
 
           <section className="actions" aria-label={t('addTitle')}>
             <button className="btn primary act" onClick={() => filesInput.current?.click()}>

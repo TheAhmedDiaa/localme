@@ -9,6 +9,7 @@ export const LIMITS = {
   maxMessageBytes: 100_000,
   maxNameLength: 255,
   maxPathLength: 1024,
+  maxDeviceName: 24,
   maxMessagesPerSecond: 60,
 } as const;
 
@@ -18,6 +19,8 @@ export interface Device {
   animal: number;
   /** 10-99, so "Fox 42" and "Fox 17" can coexist */
   num: number;
+  /** custom name chosen by the user; falls back to the random animal name */
+  name?: string;
 }
 
 export interface ItemMeta {
@@ -50,6 +53,7 @@ export type ClientMsg =
   | { t: 'add'; items: NewItem[] }
   | { t: 'remove'; ids: string[] }
   | { t: 'lock'; id: string; locked: boolean }
+  | { t: 'rename'; name: string }
   | { t: 'signal'; to: string; data: unknown };
 
 export type ServerMsg =
@@ -59,6 +63,7 @@ export type ServerMsg =
   | { t: 'added'; items: ItemMeta[] }
   | { t: 'removed'; ids: string[] }
   | { t: 'locked'; id: string; locked: boolean }
+  | { t: 'renamed'; id: string; name: string }
   | { t: 'signal'; from: string; data: unknown }
   | { t: 'error'; code: 'room-full' | 'rate-limit' | 'too-large' | 'bad-request' };
 
