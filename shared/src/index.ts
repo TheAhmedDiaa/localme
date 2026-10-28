@@ -10,6 +10,8 @@ export const LIMITS = {
   maxNameLength: 255,
   maxPathLength: 1024,
   maxDeviceName: 24,
+  maxThumbLength: 6000,
+  maxThumbsPerDevice: 150,
   maxMessagesPerSecond: 60,
 } as const;
 
@@ -40,6 +42,8 @@ export interface ItemMeta {
   addedAt: number;
   /** when set, only this device (and the owner) can see the item */
   to?: string;
+  /** tiny JPEG preview (data URL) made by the owner for images/videos */
+  thumb?: string;
 }
 
 export type NewItem = Omit<ItemMeta, 'ownerId' | 'addedAt'>;

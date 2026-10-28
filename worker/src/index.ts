@@ -170,13 +170,20 @@ export class Room {
       case 'add': {
         if (!Array.isArray(msg.items)) return;
         let owned = 0;
-        for (const it of this.items.values()) if (it.ownerId === me) owned++;
+        let thumbs = 0;
+        for (const it of this.items.values()) {
+          if (it.ownerId !== me) continue;
+          owned++;
+          if (it.thumb) thumbs++;
+        }
         const accepted: ItemMeta[] = [];
         for (const raw of msg.items) {
-          const item = this.sanitize(raw, me);
+          const item = this.sanitize(raw, me, thumbs < LIMITS.maxThumbsPerDevice);
           if (!item) continue;
           const existing = this.items.get(item.id);
           if (existing && existing.ownerId !== me) continue; // can't hijack someone else's id
+          if (existing) item.addedAt = existing.addedAt; // re-announcing (e.g. with a thumbnail) keeps its place
+          if (item.thumb && !existing?.thumb) thumbs++;
           if (!existing) {
             if (owned >= LIMITS.maxItemsPerDevice) break;
             owned++;
@@ -228,7 +235,7 @@ export class Room {
     }
   }
 
-  private sanitize(raw: NewItem, ownerId: string): ItemMeta | null {
+  private sanitize(raw: NewItem, ownerId: string, allowThumb: boolean): ItemMeta | null {
     if (!raw || typeof raw !== 'object') return null;
     const { id, kind, name, path, size, mime, text } = raw;
     if (typeof id !== 'string' || id.length < 1 || id.length > 40) return null;
@@ -247,6 +254,14 @@ export class Room {
       locked: kind === 'file' && raw.locked === true,
       addedAt: Date.now(),
     };
+    if (
+      allowThumb &&
+      kind === 'file' &&
+      typeof raw.thumb === 'string' &&
+      raw.thumb.length <= LIMITS.maxThumbLength &&
+      /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(raw.thumb)
+    )
+      item.thumb = raw.thumb;
     if (typeof raw.to === 'string' && raw.to.length > 0 && raw.to.length <= 40 && raw.to !== ownerId) item.to = raw.to;
     if (kind === 'text') {
       if (typeof text !== 'string' || text.length > LIMITS.maxTextLength) return null;

@@ -89,6 +89,7 @@ const en = {
   timeLeft: '{time} left',
   renameDevice: 'Rename this device',
   renamePlaceholder: 'Device name (empty = random)',
+  openNewTab: 'Open in new tab',
 } as const;
 
 const ar: Record<keyof typeof en, string> = {
@@ -175,6 +176,7 @@ const ar: Record<keyof typeof en, string> = {
   timeLeft: 'متبقي {time}',
   renameDevice: 'إعادة تسمية هذا الجهاز',
   renamePlaceholder: 'اسم الجهاز (فارغ = عشوائي)',
+  openNewTab: 'فتح في تبويب جديد',
   onlyFor: 'فقط لـ {name}',
   privateToYou: 'أُرسل إليك فقط',
 };

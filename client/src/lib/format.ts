@@ -23,6 +23,22 @@ export function formatSize(n: number): string {
   return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`;
 }
 
+export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text';
+const MB = 1024 * 1024;
+const TEXT_EXT = /\.(txt|md|json|csv|log|xml|ya?ml|ini|js|ts|tsx|jsx|css|html?|py|java|c|cpp|h|cs|go|rs|sh|sql)$/i;
+
+/** What the preview dialog can show for an item (null = download only). Size limits keep phones safe. */
+export function previewKind(item: { kind: 'file' | 'text'; mime: string; name: string; size: number }): PreviewKind | null {
+  if (item.kind !== 'file') return null;
+  const { mime, name, size } = item;
+  if (mime.startsWith('image/')) return size <= 25 * MB ? 'image' : null;
+  if (mime.startsWith('video/')) return size <= 300 * MB ? 'video' : null;
+  if (mime.startsWith('audio/')) return size <= 100 * MB ? 'audio' : null;
+  if (mime === 'application/pdf') return size <= 50 * MB ? 'pdf' : null;
+  if (mime.startsWith('text/') || mime === 'application/json' || TEXT_EXT.test(name)) return size <= MB ? 'text' : null;
+  return null;
+}
+
 /** Make zip entry paths unique ("a.txt", "a (2).txt"). */
 export function uniquePath(path: string, used: Set<string>): string {
   let p = path;

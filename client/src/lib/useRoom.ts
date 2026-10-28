@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClientMsg, Device, ItemMeta, NewItem, RoomInfo, ServerMsg, SignalData } from '@localme/shared';
 import { LIMITS } from '@localme/shared';
 import { P2P } from './p2p';
+import { makeThumb } from './thumb';
 import { local, uid } from './registry';
 import type { Picked } from './files';
 
@@ -170,6 +171,29 @@ export function useRoom(code: string | null) {
         metas.push(meta);
       }
       sendAdd(metas);
+
+      // Thumbnails come later: the files are shared right away, then re-announced with a small preview.
+      void (async () => {
+        const ready: NewItem[] = [];
+        const flush = () => {
+          const batch = ready.splice(0).filter((i) => local.has(i.id));
+          if (batch.length) sendAdd(batch);
+        };
+        let tried = 0;
+        for (const meta of metas) {
+          if (tried >= LIMITS.maxThumbsPerDevice) break;
+          const l = local.get(meta.id);
+          const type = l?.file?.type ?? '';
+          if (!l?.file || !(type.startsWith('image/') || type.startsWith('video/'))) continue;
+          tried++;
+          const thumb = await makeThumb(l.file);
+          if (!thumb || !local.has(meta.id)) continue;
+          l.meta.thumb = thumb;
+          ready.push(l.meta);
+          if (ready.length >= 8) flush();
+        }
+        flush();
+      })();
     },
     [sendAdd],
   );

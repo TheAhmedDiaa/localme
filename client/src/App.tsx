@@ -8,11 +8,11 @@ import { fromDrop, fromInput } from './lib/files';
 import { openSink, SaveCancelled } from './lib/sink';
 import { copyText } from './lib/clipboard';
 import { DenyError, type Download } from './lib/p2p';
-import { uniquePath } from './lib/format';
+import { previewKind, uniquePath } from './lib/format';
 import {
   ItemRow,
-  Modal,
   PasswordPrompt,
+  PreviewModal,
   Presence,
   RoomDialog,
   SetPasswordDialog,
@@ -20,6 +20,7 @@ import {
   TextDialog,
   TransferPanel,
   type ItemActions,
+  type PreviewData,
   type Transfer,
 } from './components/ui';
 import { Icon } from './components/Icon';
@@ -58,7 +59,7 @@ export default function App() {
   const [dialog, setDialog] = useState<null | 'text' | 'room'>(null);
   const [ask, setAsk] = useState<null | { item: ItemMeta; mode: Mode; wrong: boolean }>(null);
   const [setPw, setSetPw] = useState<ItemMeta | null>(null);
-  const [previewing, setPreviewing] = useState<null | { url: string; name: string }>(null);
+  const [previewing, setPreviewing] = useState<PreviewData | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [pending, setPending] = useState<ReturnType<typeof fromInput> | null>(null);
@@ -123,19 +124,40 @@ export default function App() {
       const ac = new AbortController();
       aborts.current.set(tid, ac);
       const isDownload = mode === 'download';
-      if (isDownload) setTransfers((ts) => [...ts, { id: tid, name: item.name, done: 0, total: item.size, state: 'active' }]);
+      setTransfers((ts) => [...ts, { id: tid, name: item.name, done: 0, total: item.size, state: 'active' }]);
       try {
-        const src = await fetchItem(item, password, isDownload ? (n) => bump(tid, n) : undefined);
+        const src = await fetchItem(item, password, (n) => bump(tid, n));
         if (isDownload) {
           const sink = await openSink(src.name, src.size, src.mime);
           await src.stream.pipeTo(sink, { signal: ac.signal });
           patch(tid, { state: 'done', done: src.size });
         } else {
-          const blob = await new Response(src.stream).blob();
-          setPreviewing({ url: URL.createObjectURL(new Blob([blob], { type: item.mime })), name: item.name });
+          const kind = previewKind(item) ?? 'image';
+          const own = item.ownerId === you?.id ? local.get(item.id)?.file : undefined;
+          let blob: Blob;
+          if (own) {
+            blob = own; // already on this device, no transfer needed
+          } else {
+            const parts: Uint8Array[] = [];
+            const reader = src.stream.getReader();
+            for (;;) {
+              if (ac.signal.aborted) {
+                await reader.cancel();
+                dropTransfer(tid);
+                return;
+              }
+              const { done, value } = await reader.read();
+              if (done) break;
+              parts.push(value);
+            }
+            blob = new Blob(parts as unknown as BlobPart[], { type: item.mime });
+          }
+          if (kind === 'text') setPreviewing({ kind, name: item.name, url: '', text: await blob.text() });
+          else setPreviewing({ kind, name: item.name, url: URL.createObjectURL(new Blob([blob], { type: item.mime })) });
+          dropTransfer(tid);
         }
       } catch (e) {
-        if (isDownload) dropTransfer(tid);
+        dropTransfer(tid);
         if (e instanceof DenyError && e.why === 'password') return setAsk({ item, mode, wrong: password !== undefined });
         if (e instanceof SaveCancelled || ac.signal.aborted) return;
         const msg = e instanceof DenyError ? t('ownerGone') : t('interrupted');
@@ -145,7 +167,7 @@ export default function App() {
         aborts.current.delete(tid);
       }
     },
-    [bump, dropTransfer, fetchItem, patch, t],
+    [bump, dropTransfer, fetchItem, patch, t, you],
   );
 
   const downloadAll = useCallback(async () => {
@@ -490,11 +512,7 @@ export default function App() {
           }}
         />
       )}
-      {previewing && (
-        <Modal title={previewing.name} onClose={() => setPreviewing(null)}>
-          <img className="preview" src={previewing.url} alt={previewing.name} />
-        </Modal>
-      )}
+      {previewing && <PreviewModal data={previewing} onClose={() => setPreviewing(null)} />}
     </div>
   );
 }

@@ -3,13 +3,13 @@ import QRCode from 'qrcode';
 import type { Device, ItemMeta, RoomInfo } from '@localme/shared';
 import { ROOM_CODE_RE } from '@localme/shared';
 import { useI18n } from '../lib/i18n';
-import { fileBadge, formatSize } from '../lib/format';
+import { fileBadge, formatSize, previewKind, type PreviewKind } from '../lib/format';
 import { copyText } from '../lib/clipboard';
 import { Icon } from './Icon';
 
 // ───────────────────────────── generic modal ─────────────────────────────
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const { t } = useI18n();
   const titleId = useId();
   useEffect(() => {
@@ -24,7 +24,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   }, [onClose]);
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="modal-head">
           <h2 id={titleId}>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label={t('close')}>
@@ -471,13 +471,19 @@ export function ItemRow({
   copied: boolean;
 }) {
   const { t } = useI18n();
-  const canPreview = item.kind === 'file' && item.mime.startsWith('image/') && item.size <= 25 * 1024 * 1024;
+  const canPreview = previewKind(item) !== null;
   const badge = fileBadge(item.kind, item.mime, item.name);
   return (
     <li className="row">
-      <span className={`file-badge ${badge.cls}`} aria-hidden="true">
-        {badge.label}
-      </span>
+      {item.thumb ? (
+        <button className="thumb" onClick={() => actions.preview(item)} disabled={!canPreview} aria-label={t('preview')} title={t('preview')}>
+          <img src={item.thumb} alt="" width={46} height={46} />
+        </button>
+      ) : (
+        <span className={`file-badge ${badge.cls}`} aria-hidden="true">
+          {badge.label}
+        </span>
+      )}
       <div className="row-main">
         <div className="row-name">
           {item.kind === 'text' ? (
@@ -547,6 +553,41 @@ export function ItemRow({
 }
 
 // ───────────────────────────── transfers ─────────────────────────────
+
+// ───────────────────────────── preview dialog ─────────────────────────────
+
+export interface PreviewData {
+  url: string;
+  name: string;
+  kind: PreviewKind;
+  text?: string;
+}
+
+export function PreviewModal({ data, onClose }: { data: PreviewData; onClose: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Modal title={data.name} onClose={onClose} wide>
+      {data.kind === 'image' && <img className="preview" src={data.url} alt={data.name} />}
+      {data.kind === 'video' && <video className="preview" src={data.url} controls autoPlay playsInline />}
+      {data.kind === 'audio' && <audio className="preview-audio" src={data.url} controls autoPlay />}
+      {data.kind === 'pdf' && (
+        <>
+          <iframe className="preview-frame" src={data.url} title={data.name} />
+          <p>
+            <a className="link" href={data.url} target="_blank" rel="noreferrer">
+              {t('openNewTab')}
+            </a>
+          </p>
+        </>
+      )}
+      {data.kind === 'text' && (
+        <pre className="preview-text" dir="auto">
+          {data.text}
+        </pre>
+      )}
+    </Modal>
+  );
+}
 
 export interface Transfer {
   id: string;
